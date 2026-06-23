@@ -20,6 +20,12 @@ const TABS: Tab[] = [
   { code: "us", label: "アメリカ", flag: "🇺🇸" },
 ];
 
+const COUNTRY_LANG: Record<string, string> = {
+  jp: "ja",
+  kr: "ko",
+  us: "en",
+};
+
 const LANGS: LangOption[] = [
   { code: "ja", label: "日本語", flag: "🇯🇵" },
   { code: "ko", label: "한국어", flag: "🇰🇷" },
@@ -74,8 +80,8 @@ export default function Home() {
     const descs = src.map((a) => a.description ?? "");
 
     Promise.all([
-      fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texts: titles, targetLang: displayLang }) }).then((r) => r.json()),
-      fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texts: descs, targetLang: displayLang }) }).then((r) => r.json()),
+      fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texts: titles, targetLang: displayLang, sourceLang: COUNTRY_LANG[active] }) }).then((r) => r.json()),
+      fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texts: descs, targetLang: displayLang, sourceLang: COUNTRY_LANG[active] }) }).then((r) => r.json()),
     ]).then(([titleRes, descRes]) => {
       const result = src.map((a, i) => ({
         ...a,
