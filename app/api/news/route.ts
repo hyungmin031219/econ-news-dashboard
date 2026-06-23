@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
   const gnewsKey = process.env.GNEWS_KEY;
 
   const configs: Record<string, { url: string; useGnews: boolean }> = {
-    us: { url: `https://newsapi.org/v2/top-headlines?country=us&category=business&pageSize=20&apiKey=${apiKey}`, useGnews: false },
+    us: { url: `https://newsapi.org/v2/top-headlines?country=us&category=business&pageSize=100&apiKey=${apiKey}`, useGnews: false },
     jp: { url: `https://gnews.io/api/v4/top-headlines?category=business&lang=ja&country=jp&max=20&apikey=${gnewsKey}`, useGnews: true },
-    kr: { url: `https://newsapi.org/v2/everything?q=경제 OR 주식 OR 비즈니스&language=ko&sortBy=publishedAt&pageSize=20&apiKey=${apiKey}`, useGnews: false },
+    kr: { url: `https://newsapi.org/v2/everything?q=경제 OR 주식 OR 비즈니스&language=ko&sortBy=publishedAt&pageSize=100&apiKey=${apiKey}`, useGnews: false },
   };
   const config = configs[country] ?? configs.us;
   const url = config.url;
