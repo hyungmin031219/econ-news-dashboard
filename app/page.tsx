@@ -42,6 +42,27 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}日前`;
 }
 
+function formatAnalysis(text: string) {
+  const sections = text.split(/\n(?=\*\*①|\*\*②|\*\*③)/).filter(Boolean);
+  if (sections.length < 2) return <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{text}</p>;
+
+  return (
+    <div className="space-y-3">
+      {sections.map((section, i) => {
+        const match = section.match(/^\*\*([^*]+)\*\*\n?([\s\S]*)/);
+        if (!match) return <p key={i} className="text-xs text-gray-600 leading-relaxed">{section}</p>;
+        const [, heading, body] = match;
+        return (
+          <div key={i}>
+            <p className="text-[11px] font-semibold text-gray-800 mb-0.5">{heading}</p>
+            <p className="text-xs text-gray-600 leading-relaxed">{body.trim()}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Home() {
   const [active, setActive] = useState("jp");
   const [articles, setArticles] = useState<Record<string, Article[]>>({});
@@ -50,6 +71,11 @@ export default function Home() {
   const [displayLang, setDisplayLang] = useState("ja");
   const [translated, setTranslated] = useState<Record<string, Article[]>>({});
   const [translating, setTranslating] = useState(false);
+
+  // AI分析の状態
+  const [analysisCache, setAnalysisCache] = useState<Record<string, string>>({});
+  const [loadingAnalysis, setLoadingAnalysis] = useState<Record<string, boolean>>({});
+  const [expandedAnalysis, setExpandedAnalysis] = useState<Record<string, boolean>>({});
 
   const fetchNews = useCallback(async (country: string) => {
     if (articles[country]) return;
@@ -93,6 +119,34 @@ export default function Home() {
       setTranslated((p) => ({ ...p, [cacheKey]: src }));
     }).finally(() => setTranslating(false));
   }, [active, displayLang, articles, translated]);
+
+  const handleAnalyze = useCallback(async (article: Article, key: string) => {
+    if (expandedAnalysis[key] && analysisCache[key]) {
+      setExpandedAnalysis((p) => ({ ...p, [key]: !p[key] }));
+      return;
+    }
+    if (analysisCache[key]) {
+      setExpandedAnalysis((p) => ({ ...p, [key]: true }));
+      return;
+    }
+
+    setLoadingAnalysis((p) => ({ ...p, [key]: true }));
+    setExpandedAnalysis((p) => ({ ...p, [key]: true }));
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: article.title, description: article.description }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "分析失敗");
+      setAnalysisCache((p) => ({ ...p, [key]: data.analysis }));
+    } catch (e) {
+      setAnalysisCache((p) => ({ ...p, [key]: `エラー: ${(e as Error).message}` }));
+    } finally {
+      setLoadingAnalysis((p) => ({ ...p, [key]: false }));
+    }
+  }, [analysisCache, expandedAnalysis]);
 
   const cacheKey = `${active}_${displayLang}`;
   const current = translated[cacheKey] ?? articles[active] ?? [];
@@ -176,53 +230,112 @@ export default function Home() {
 
         {!isTranslating && (
           <div className="divide-y divide-gray-100">
-            {current.map((article, i) => (
-              <a
-                key={i}
-                href={article.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex gap-5 py-5 group hover:bg-gray-50 transition-colors -mx-4 px-4"
-              >
-                {/* 連番 */}
-                <span className="text-xs text-gray-300 font-mono w-6 flex-shrink-0 pt-1 text-right">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
+            {current.map((article, i) => {
+              const articleKey = `${active}_${i}`;
+              const isExpanded = expandedAnalysis[articleKey];
+              const isAnalyzing = loadingAnalysis[articleKey];
+              const analysis = analysisCache[articleKey];
 
-                {/* サムネイル */}
-                {article.urlToImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={article.urlToImage}
-                    alt=""
-                    className="w-24 h-16 object-cover flex-shrink-0 bg-gray-100 grayscale group-hover:grayscale-0 transition-all"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                  />
-                ) : (
-                  <div className="w-24 h-16 flex-shrink-0 bg-gray-100" />
-                )}
+              return (
+                <div key={i} className="py-5">
+                  {/* 記事メイン行 */}
+                  <div className="flex gap-5 group">
+                    {/* 連番 */}
+                    <span className="text-xs text-gray-300 font-mono w-6 flex-shrink-0 pt-1 text-right">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
 
-                {/* テキスト */}
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-2 group-hover:underline underline-offset-2">
-                    {article.title}
-                  </h2>
-                  {article.description && (
-                    <p className="text-xs text-gray-500 mt-1.5 line-clamp-2 leading-relaxed">
-                      {article.description}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
-                    <span className="font-medium text-gray-500 uppercase tracking-wide text-[10px]">{article.source.name}</span>
-                    <span className="text-gray-300">|</span>
-                    <span>{timeAgo(article.publishedAt)}</span>
+                    {/* サムネイル */}
+                    {article.urlToImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={article.urlToImage}
+                        alt=""
+                        className="w-24 h-16 object-cover flex-shrink-0 bg-gray-100 grayscale group-hover:grayscale-0 transition-all"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
+                    ) : (
+                      <div className="w-24 h-16 flex-shrink-0 bg-gray-100" />
+                    )}
+
+                    {/* テキスト */}
+                    <div className="flex-1 min-w-0">
+                      <a
+                        href={article.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block"
+                      >
+                        <h2 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-2 hover:underline underline-offset-2">
+                          {article.title}
+                        </h2>
+                      </a>
+                      {article.description && (
+                        <p className="text-xs text-gray-500 mt-1.5 line-clamp-2 leading-relaxed">
+                          {article.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 mt-2">
+                        <div className="flex items-center gap-3 text-xs text-gray-400">
+                          <span className="font-medium text-gray-500 uppercase tracking-wide text-[10px]">{article.source.name}</span>
+                          <span className="text-gray-300">|</span>
+                          <span>{timeAgo(article.publishedAt)}</span>
+                        </div>
+                        {/* AI分析ボタン */}
+                        <button
+                          onClick={() => handleAnalyze(article, articleKey)}
+                          className={`ml-2 inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-medium tracking-wide border transition-colors ${
+                            isExpanded
+                              ? "border-black bg-black text-white"
+                              : "border-gray-300 text-gray-500 hover:border-gray-500 hover:text-gray-700"
+                          }`}
+                        >
+                          {isAnalyzing ? (
+                            <>
+                              <svg className="animate-spin h-2.5 w-2.5" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                              </svg>
+                              分析中
+                            </>
+                          ) : (
+                            <>
+                              <span>✦</span>
+                              AI分析
+                              {isExpanded ? " ▲" : " ▼"}
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 矢印 */}
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gray-300 hover:text-black transition-colors text-lg flex-shrink-0 self-center"
+                    >
+                      →
+                    </a>
                   </div>
-                </div>
 
-                {/* 矢印 */}
-                <span className="text-gray-300 group-hover:text-black transition-colors text-lg flex-shrink-0 self-center">→</span>
-              </a>
-            ))}
+                  {/* AI分析パネル */}
+                  {isExpanded && (
+                    <div className="mt-3 ml-[76px] border-l-2 border-black pl-4 pr-2">
+                      {isAnalyzing && !analysis ? (
+                        <p className="text-xs text-gray-400 py-2">AIが記事を分析中です...</p>
+                      ) : analysis ? (
+                        <div className="py-1">
+                          <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-2 font-medium">AI Analysis</p>
+                          {formatAnalysis(analysis)}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
