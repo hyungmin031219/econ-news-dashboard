@@ -12,11 +12,18 @@ type Article = {
 };
 
 type Tab = { code: string; label: string; flag: string };
+type LangOption = { code: string; label: string; flag: string };
 
 const TABS: Tab[] = [
   { code: "jp", label: "日本", flag: "🇯🇵" },
   { code: "kr", label: "韓国", flag: "🇰🇷" },
   { code: "us", label: "アメリカ", flag: "🇺🇸" },
+];
+
+const LANGS: LangOption[] = [
+  { code: "ja", label: "日本語", flag: "🇯🇵" },
+  { code: "ko", label: "한국어", flag: "🇰🇷" },
+  { code: "en", label: "English", flag: "🇺🇸" },
 ];
 
 function timeAgo(iso: string): string {
@@ -34,6 +41,9 @@ export default function Home() {
   const [articles, setArticles] = useState<Record<string, Article[]>>({});
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [displayLang, setDisplayLang] = useState("ja");
+  const [translated, setTranslated] = useState<Record<string, Article[]>>({});
+  const [translating, setTranslating] = useState(false);
 
   const fetchNews = useCallback(async (country: string) => {
     if (articles[country]) return;
@@ -52,16 +62,62 @@ export default function Home() {
 
   useEffect(() => { fetchNews(active); }, [active, fetchNews]);
 
-  const current = articles[active] ?? [];
+  // 言語が変わったら翻訳
+  useEffect(() => {
+    const cacheKey = `${active}_${displayLang}`;
+    if (translated[cacheKey]) return;
+    const src = articles[active];
+    if (!src || src.length === 0) return;
+
+    setTranslating(true);
+    const titles = src.map((a) => a.title);
+    const descs = src.map((a) => a.description ?? "");
+
+    Promise.all([
+      fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texts: titles, targetLang: displayLang }) }).then((r) => r.json()),
+      fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texts: descs, targetLang: displayLang }) }).then((r) => r.json()),
+    ]).then(([titleRes, descRes]) => {
+      const result = src.map((a, i) => ({
+        ...a,
+        title: titleRes.translated?.[i] ?? a.title,
+        description: descRes.translated?.[i] || a.description,
+      }));
+      setTranslated((p) => ({ ...p, [cacheKey]: result }));
+    }).catch(() => {
+      setTranslated((p) => ({ ...p, [cacheKey]: src }));
+    }).finally(() => setTranslating(false));
+  }, [active, displayLang, articles, translated]);
+
+  const cacheKey = `${active}_${displayLang}`;
+  const current = translated[cacheKey] ?? articles[active] ?? [];
   const isLoading = loading[active];
   const error = errors[active];
+  const isTranslating = translating && !translated[cacheKey];
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <h1 className="text-xl font-bold text-gray-900">📊 経済ニュースダッシュボード</h1>
-          <p className="text-sm text-gray-500 mt-0.5">日本・韓国・アメリカのビジネスニュース</p>
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">📊 経済ニュースダッシュボード</h1>
+            <p className="text-sm text-gray-500 mt-0.5">日本・韓国・アメリカのビジネスニュース</p>
+          </div>
+          {/* 言語セレクター */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            {LANGS.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => setDisplayLang(lang.code)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  displayLang === lang.code
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {lang.flag} {lang.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex gap-1">
@@ -83,13 +139,13 @@ export default function Home() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6">
-        {isLoading && (
+        {(isLoading || isTranslating) && (
           <div className="flex items-center justify-center py-20 text-gray-500">
             <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
             </svg>
-            ニュースを取得中…
+            {isTranslating ? "翻訳中…" : "ニュースを取得中…"}
           </div>
         )}
 
@@ -99,55 +155,57 @@ export default function Home() {
           </div>
         )}
 
-        {!isLoading && !error && current.length === 0 && (
+        {!isLoading && !isTranslating && !error && current.length === 0 && (
           <p className="text-center text-gray-400 py-20">記事が見つかりませんでした</p>
         )}
 
-        <div className="space-y-3">
-          {current.map((article, i) => (
-            <a
-              key={i}
-              href={article.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all group"
-            >
-              <div className="flex gap-4">
-                {article.urlToImage && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={article.urlToImage}
-                    alt=""
-                    className="w-20 h-20 object-cover rounded-lg flex-shrink-0 bg-gray-100"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-sm font-semibold text-gray-900 leading-snug group-hover:text-blue-600 line-clamp-2">
-                    {article.title}
-                  </h2>
-                  {article.description && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">
-                      {article.description}
-                    </p>
+        {!isTranslating && (
+          <div className="space-y-3">
+            {current.map((article, i) => (
+              <a
+                key={i}
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all group"
+              >
+                <div className="flex gap-4">
+                  {article.urlToImage && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={article.urlToImage}
+                      alt=""
+                      className="w-20 h-20 object-cover rounded-lg flex-shrink-0 bg-gray-100"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                    />
                   )}
-                  <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
-                    <span className="font-medium text-gray-600">{article.source.name}</span>
-                    <span>·</span>
-                    <span>{timeAgo(article.publishedAt)}</span>
-                    <span className="ml-auto text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                      記事を読む →
-                    </span>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-sm font-semibold text-gray-900 leading-snug group-hover:text-blue-600 line-clamp-2">
+                      {article.title}
+                    </h2>
+                    {article.description && (
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">
+                        {article.description}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
+                      <span className="font-medium text-gray-600">{article.source.name}</span>
+                      <span>·</span>
+                      <span>{timeAgo(article.publishedAt)}</span>
+                      <span className="ml-auto text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                        記事を読む →
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </a>
-          ))}
-        </div>
+              </a>
+            ))}
+          </div>
+        )}
 
-        {!isLoading && current.length > 0 && (
+        {!isLoading && !isTranslating && current.length > 0 && (
           <p className="text-center text-xs text-gray-400 mt-6">
-            {current.length}件の記事 · Powered by NewsAPI
+            {current.length}件の記事 · Powered by NewsAPI & GNews
           </p>
         )}
       </main>
