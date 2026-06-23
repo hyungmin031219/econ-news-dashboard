@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
   const configs: Record<string, string> = {
     us: `https://newsapi.org/v2/top-headlines?country=us&category=business&pageSize=20&apiKey=${apiKey}`,
-    jp: `https://newsapi.org/v2/everything?q=経済 OR 株式 OR ビジネス&language=ja&sortBy=publishedAt&pageSize=20&apiKey=${apiKey}`,
+    jp: `https://newsapi.org/v2/everything?q=株&language=ja&sortBy=publishedAt&pageSize=20&apiKey=${apiKey}`,
     kr: `https://newsapi.org/v2/everything?q=경제 OR 주식 OR 비즈니스&language=ko&sortBy=publishedAt&pageSize=20&apiKey=${apiKey}`,
   };
   const url = configs[country] ?? configs.us;
