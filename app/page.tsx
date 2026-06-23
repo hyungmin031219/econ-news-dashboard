@@ -101,117 +101,134 @@ export default function Home() {
   const isTranslating = translating && !translated[cacheKey];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-start justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">📊 経済ニュースダッシュボード</h1>
-            <p className="text-sm text-gray-500 mt-0.5">日本・韓国・アメリカのビジネスニュース</p>
-          </div>
+    <div className="min-h-screen bg-white text-gray-900">
+
+      {/* トップバー */}
+      <div className="bg-black text-white">
+        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+          <span className="text-xs tracking-widest uppercase font-medium text-gray-400">Economic News Dashboard</span>
           {/* 言語セレクター */}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            {LANGS.map((lang) => (
+          <div className="flex items-center gap-0 border border-gray-700">
+            {LANGS.map((lang, i) => (
               <button
                 key={lang.code}
                 onClick={() => setDisplayLang(lang.code)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                className={`px-3 py-1 text-xs font-medium tracking-wide transition-colors ${
                   displayLang === lang.code
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
+                    ? "bg-white text-black"
+                    : "text-gray-400 hover:text-white"
+                } ${i !== LANGS.length - 1 ? "border-r border-gray-700" : ""}`}
               >
                 {lang.flag} {lang.label}
               </button>
             ))}
           </div>
         </div>
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="flex gap-1">
+      </div>
+
+      {/* ヘッダー */}
+      <header className="border-b border-gray-200 sticky top-0 z-10 bg-white">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="py-5 border-b border-gray-100">
+            <h1 className="text-2xl font-bold tracking-tight text-black">経済ニュースダッシュボード</h1>
+            <p className="text-xs text-gray-500 mt-1 tracking-wide">日本・韓国・アメリカのビジネスニュース</p>
+          </div>
+          {/* タブ */}
+          <div className="flex">
             {TABS.map((tab) => (
               <button
                 key={tab.code}
                 onClick={() => setActive(tab.code)}
-                className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                className={`px-6 py-3 text-sm font-medium tracking-wide border-b-2 transition-colors ${
                   active === tab.code
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    ? "border-black text-black"
+                    : "border-transparent text-gray-400 hover:text-gray-700"
                 }`}
               >
-                {tab.flag} {tab.label}
+                <span className="text-xs mr-1.5 text-gray-400">{tab.flag}</span>
+                {tab.label}
               </button>
             ))}
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6">
+      <main className="max-w-5xl mx-auto px-6 py-8">
         {(isLoading || isTranslating) && (
-          <div className="flex items-center justify-center py-20 text-gray-500">
-            <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none">
+          <div className="flex items-center justify-center py-24 text-gray-400">
+            <svg className="animate-spin h-4 w-4 mr-3" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
             </svg>
-            {isTranslating ? "翻訳中…" : "ニュースを取得中…"}
+            <span className="text-sm tracking-wide">{isTranslating ? "翻訳中..." : "ニュースを取得中..."}</span>
           </div>
         )}
 
         {error && !isLoading && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+          <div className="border border-gray-300 bg-gray-50 p-4 text-sm text-gray-700">
             ⚠️ {error}
           </div>
         )}
 
         {!isLoading && !isTranslating && !error && current.length === 0 && (
-          <p className="text-center text-gray-400 py-20">記事が見つかりませんでした</p>
+          <p className="text-center text-gray-400 py-24 text-sm tracking-wide">記事が見つかりませんでした</p>
         )}
 
         {!isTranslating && (
-          <div className="space-y-3">
+          <div className="divide-y divide-gray-100">
             {current.map((article, i) => (
               <a
                 key={i}
                 href={article.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all group"
+                className="flex gap-5 py-5 group hover:bg-gray-50 transition-colors -mx-4 px-4"
               >
-                <div className="flex gap-4">
-                  {article.urlToImage && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={article.urlToImage}
-                      alt=""
-                      className="w-20 h-20 object-cover rounded-lg flex-shrink-0 bg-gray-100"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                    />
+                {/* 連番 */}
+                <span className="text-xs text-gray-300 font-mono w-6 flex-shrink-0 pt-1 text-right">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+
+                {/* サムネイル */}
+                {article.urlToImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={article.urlToImage}
+                    alt=""
+                    className="w-24 h-16 object-cover flex-shrink-0 bg-gray-100 grayscale group-hover:grayscale-0 transition-all"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <div className="w-24 h-16 flex-shrink-0 bg-gray-100" />
+                )}
+
+                {/* テキスト */}
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-2 group-hover:underline underline-offset-2">
+                    {article.title}
+                  </h2>
+                  {article.description && (
+                    <p className="text-xs text-gray-500 mt-1.5 line-clamp-2 leading-relaxed">
+                      {article.description}
+                    </p>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-sm font-semibold text-gray-900 leading-snug group-hover:text-blue-600 line-clamp-2">
-                      {article.title}
-                    </h2>
-                    {article.description && (
-                      <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">
-                        {article.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
-                      <span className="font-medium text-gray-600">{article.source.name}</span>
-                      <span>·</span>
-                      <span>{timeAgo(article.publishedAt)}</span>
-                      <span className="ml-auto text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                        記事を読む →
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                    <span className="font-medium text-gray-500 uppercase tracking-wide text-[10px]">{article.source.name}</span>
+                    <span className="text-gray-300">|</span>
+                    <span>{timeAgo(article.publishedAt)}</span>
                   </div>
                 </div>
+
+                {/* 矢印 */}
+                <span className="text-gray-300 group-hover:text-black transition-colors text-lg flex-shrink-0 self-center">→</span>
               </a>
             ))}
           </div>
         )}
 
         {!isLoading && !isTranslating && current.length > 0 && (
-          <p className="text-center text-xs text-gray-400 mt-6">
-            {current.length}件の記事 · Powered by NewsAPI & GNews
+          <p className="text-center text-xs text-gray-300 mt-10 tracking-widest uppercase">
+            {current.length} Articles · Powered by NewsAPI & GNews
           </p>
         )}
       </main>
